@@ -20,9 +20,7 @@ def _transport_security_settings() -> TransportSecuritySettings:
     """Configure transport security defaults for local + Vercel hosting."""
 
     return TransportSecuritySettings(
-        enable_dns_rebinding_protection=True,
-        allowed_hosts=["*"],
-        allowed_origins=["*"],
+        enable_dns_rebinding_protection=False,
     )
 
 
