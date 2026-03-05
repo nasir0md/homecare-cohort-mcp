@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#0d1117;color:#e6edf3;padding:16px;line-height:1.5}
+h2{font-size:16px;font-weight:600;margin-bottom:4px;color:#f0f6fc}
+.subtitle{font-size:12px;color:#8b949e;margin-bottom:14px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px}
+.card{background:#161b22;border:1px solid #30363d;border-radius:8px;padding:14px;transition:border-color .15s}
+.card:hover{border-color:#58a6ff}
+.row{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}
+.pill{font-size:11px;padding:2px 8px;border-radius:10px;background:#1f3a5f;color:#58a6ff;text-transform:uppercase;letter-spacing:.5px}
+.pid{font-size:15px;font-weight:600;color:#58a6ff}
+.meta{font-size:12px;color:#8b949e;margin-top:6px}
+.flags{margin-top:8px;font-size:12px}
+.flags span{display:inline-block;background:#21262d;color:#c9d1d9;border-radius:10px;padding:2px 8px;margin:2px 4px 0 0}
+#loading{text-align:center;padding:40px;color:#8b949e}
+</style>
+</head>
+<body>
+<h2>High-Risk Cohort (Step 1a)</h2>
+<p class="subtitle" id="subtitle">Waiting for results...</p>
+<div id="loading">Loading patients...</div>
+<div class="grid" id="grid"></div>
+<script>
+function extractData(payload){
+  if(!payload)return null;
+  if(typeof payload==="string"){
+    try{return extractData(JSON.parse(payload));}catch(_){return null;}
+  }
+  if(typeof payload!=="object")return null;
+  if(payload.structuredContent)return payload.structuredContent;
+  if(payload._meta)return extractData(payload._meta);
+  if(payload.toolOutput)return extractData(payload.toolOutput);
+  if(payload.toolResponseMetadata)return extractData(payload.toolResponseMetadata);
+  if(payload.result)return extractData(payload.result);
+  if(payload.params)return extractData(payload.params);
+  if(payload.arguments)return extractData(payload.arguments);
+  if(payload.globals&&payload.globals.toolOutput)return extractData(payload.globals.toolOutput);
+  if(payload.jsonrpc||payload.method)return null;
+  return payload;
+}
+function maybeRender(payload){
+  var data=extractData(payload);
+  if(!data)return false;
+  render(data);
+  return true;
+}
+function hydrateFromHost(){
+  if(maybeRender(window.openai&&window.openai.toolOutput))return;
+  if(maybeRender(window.openai&&window.openai.toolResponseMetadata))return;
+  if(maybeRender(window.openai&&window.openai.globals&&window.openai.globals.toolOutput))return;
+  var attempts=0;
+  var timer=setInterval(function(){
+    attempts+=1;
+    if(maybeRender(window.openai&&window.openai.toolOutput))return clearInterval(timer);
+    if(maybeRender(window.openai&&window.openai.toolResponseMetadata))return clearInterval(timer);
+    if(maybeRender(window.openai&&window.openai.globals&&window.openai.globals.toolOutput))return clearInterval(timer);
+    if(attempts>=80)clearInterval(timer);
+  },100);
+}
+var initRequestId=null;
+function initializeHostBridge(){
+  initRequestId=Date.now();
+  window.parent.postMessage({
+    jsonrpc:"2.0",
+    id:initRequestId,
+    method:"ui/initialize",
+    params:{
+      appInfo:{name:"homecare-widget",version:"1.0.0"},
+      appCapabilities:{},
+      protocolVersion:"2026-01-26"
+    }
+  },"*");
+}
+window.addEventListener("message",function(e){
+  var m=e.data;
+  if(typeof m==="string"){
+    try{m=JSON.parse(m);}catch(_){return;}
+  }
+  if(!m)return;
+  if(m.id===initRequestId&&m.result){
+    window.parent.postMessage({jsonrpc:"2.0",method:"ui/notifications/initialized"},"*");
+  }
+  if(m.jsonrpc&&m.jsonrpc!=="2.0")return;
+  maybeRender(m);
+},{passive:true});
+hydrateFromHost();
+initializeHostBridge();
+function render(data){
+  var patients=data.patients||[];
+  document.getElementById("loading").style.display="none";
+  document.getElementById("subtitle").textContent="Flagged "+patients.length+" patient(s)";
+  var grid=document.getElementById("grid");
+  grid.innerHTML="";
+  patients.forEach(function(p){
+    var card=document.createElement("div");
+    card.className="card";
+    var dx=p.primary_dx_code||p.primary_dx_desc||"—";
+    var risk=p.risk_tier||"LOW";
+    var hba1c=p.hba1c_value!=null?(p.hba1c_value.toFixed(1)+"%"):"n/a";
+    var bp=p.sbp_value!=null?Math.round(p.sbp_value)+"/"+Math.round(p.dbp_value||0):"n/a";
+    var flags=(p.severity_reasons||[]).slice(0,4);
+    var flagHtml=flags.map(function(f){return '<span>'+esc(f)+'</span>';}).join("");
+    if(!flagHtml)flagHtml='<span>Escalation recommended</span>';
+    card.innerHTML=
+      '<div class="row">'+
+        '<span class="pid">'+esc(p.patient_id)+'</span>'+
+        '<span class="pill">'+esc(risk)+'</span>'+
+      '</div>'+
+      '<div class="meta">Age: <strong>'+nvl(p.age)+'</strong> · Score: <strong>'+nvl(p.composite_risk_score)+'</strong></div>'+
+      '<div class="meta">Primary DX: <strong>'+esc(dx)+'</strong></div>'+
+      '<div class="meta">Last encounter: <strong>'+nvl(p.last_encounter_date)+'</strong></div>'+
+      '<div class="meta">HbA1c: <strong>'+hba1c+'</strong> · BP: <strong>'+bp+'</strong></div>'+
+      '<div class="flags">'+flagHtml+'</div>';
+    grid.appendChild(card);
+  });
+}
+function esc(s){if(!s)return"—";var d=document.createElement("span");d.textContent=s;return d.innerHTML}
+function nvl(v){return v==null?"—":v}
+</script>
+</body>
+</html>
