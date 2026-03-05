@@ -12,6 +12,7 @@ from starlette.routing import Mount
 from mcp.types import CallToolResult, TextContent
 
 from db import ensure_database, query_df, query_one, query_value
+import ui
 
 ensure_database()
 
@@ -41,6 +42,7 @@ mcp = FastMCP(
     streamable_http_path="/",
     transport_security=_transport_security_settings(),
 )
+ui.register(mcp)
 
 
 def _to_float(value) -> Optional[float]:
@@ -330,6 +332,12 @@ def _build_gap_plan(summary: dict) -> List[dict]:
         "Summarize the synthetic homecare cohort: risk distribution, chronic conditions, "
         "payer mix, and recent acute encounters."
     ),
+    meta={
+        "ui": {"resourceUri": "ui://homecare-cohort/population-snapshot.html"},
+        "ui/resourceUri": "ui://homecare-cohort/population-snapshot.html",
+        "openai/widgetAccessible": True,
+        "openai/outputTemplate": "ui://homecare-cohort/population-snapshot.html",
+    },
 )
 def population_snapshot(ctx: Context, window_days: int = 90) -> CallToolResult:  # noqa: ARG001
     cutoff = (dt.date.today() - dt.timedelta(days=max(window_days, 1))).isoformat()
@@ -406,6 +414,11 @@ def population_snapshot(ctx: Context, window_days: int = 90) -> CallToolResult: 
     return CallToolResult(
         content=[TextContent(type="text", text="\n".join(markdown_sections))],
         structuredContent=structured,
+        _meta={
+            "openai/outputTemplate": "ui://homecare-cohort/population-snapshot.html",
+            "openai/widgetAccessible": True,
+            **structured,
+        },
     )
 
 
@@ -415,6 +428,12 @@ def population_snapshot(ctx: Context, window_days: int = 90) -> CallToolResult: 
         "Identify the Step 1a high-risk cohort: patients with uncontrolled HbA1c/BP, overdue screenings, "
         "or recent acute events. Returns a limited list with key metrics for quality managers."
     ),
+    meta={
+        "ui": {"resourceUri": "ui://homecare-cohort/highrisk-cohort.html"},
+        "ui/resourceUri": "ui://homecare-cohort/highrisk-cohort.html",
+        "openai/widgetAccessible": True,
+        "openai/outputTemplate": "ui://homecare-cohort/highrisk-cohort.html",
+    },
 )
 def get_highrisk_cohort(ctx: Context, limit: int = 6) -> CallToolResult:  # noqa: ARG001
     limit = max(1, min(limit, 10))
@@ -475,6 +494,11 @@ def get_highrisk_cohort(ctx: Context, limit: int = 6) -> CallToolResult:  # noqa
     return CallToolResult(
         content=[TextContent(type="text", text="\n\n".join(markdown_sections))],
         structuredContent=structured,
+        _meta={
+            "openai/outputTemplate": "ui://homecare-cohort/highrisk-cohort.html",
+            "openai/widgetAccessible": True,
+            **structured,
+        },
     )
 
 
@@ -516,6 +540,12 @@ def _format_flags(flags: list[str]) -> str:
 @mcp.tool(
     name="patient_profile",
     description="Return a risk-aware summary for a specific patient, including trends and outstanding gaps.",
+    meta={
+        "ui": {"resourceUri": "ui://homecare-cohort/patient-profile.html"},
+        "ui/resourceUri": "ui://homecare-cohort/patient-profile.html",
+        "openai/widgetAccessible": True,
+        "openai/outputTemplate": "ui://homecare-cohort/patient-profile.html",
+    },
 )
 def patient_profile(ctx: Context, patient_id: str) -> CallToolResult:  # noqa: ARG001
     patient = query_one("SELECT * FROM patients WHERE patient_id = ?", [patient_id])
@@ -656,6 +686,11 @@ def patient_profile(ctx: Context, patient_id: str) -> CallToolResult:  # noqa: A
     return CallToolResult(
         content=[TextContent(type="text", text="\n".join(summary_lines))],
         structuredContent=structured,
+        _meta={
+            "openai/outputTemplate": "ui://homecare-cohort/patient-profile.html",
+            "openai/widgetAccessible": True,
+            **structured,
+        },
     )
 
 
@@ -665,6 +700,12 @@ def patient_profile(ctx: Context, patient_id: str) -> CallToolResult:  # noqa: A
         "Generate the Step 1b care gap closure table for flagged patients. "
         "Returns HEDIS gaps, days overdue, recommended channel, and alternate therapy tags."
     ),
+    meta={
+        "ui": {"resourceUri": "ui://homecare-cohort/care-gap-plan.html"},
+        "ui/resourceUri": "ui://homecare-cohort/care-gap-plan.html",
+        "openai/widgetAccessible": True,
+        "openai/outputTemplate": "ui://homecare-cohort/care-gap-plan.html",
+    },
 )
 def care_gap_closure_plan(
     ctx: Context,
@@ -739,6 +780,11 @@ def care_gap_closure_plan(
     return CallToolResult(
         content=[TextContent(type="text", text=markdown)],
         structuredContent=structured,
+        _meta={
+            "openai/outputTemplate": "ui://homecare-cohort/care-gap-plan.html",
+            "openai/widgetAccessible": True,
+            **structured,
+        },
     )
 
 

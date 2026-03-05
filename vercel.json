@@ -2,7 +2,8 @@
   "version": 2,
   "functions": {
     "api/index.py": {
-      "excludeFiles": "smoke_test.py"
+      "excludeFiles": "smoke_test.py",
+      "includeFiles": "{data,widgets}/**"
     }
   },
   "routes": [
