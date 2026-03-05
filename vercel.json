@@ -1,5 +1,6 @@
 {
   "version": 2,
+  "buildCommand": "uv pip install --system -r requirements.txt && python -c \"from db import ensure_database; ensure_database()\"",
   "functions": {
     "api/index.py": {
       "excludeFiles": "smoke_test.py"
