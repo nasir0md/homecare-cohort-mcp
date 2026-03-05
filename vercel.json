@@ -1,5 +1,10 @@
 {
   "version": 2,
+  "functions": {
+    "api/index.py": {
+      "excludeFiles": "smoke_test.py"
+    }
+  },
   "routes": [
     { "src": "/mcp(?:/.*)?", "dest": "/api/index.py" }
   ]
