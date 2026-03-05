@@ -2,3 +2,10 @@
 name = "homecare-cohort-mcp"
 version = "0.1.0"
 requires-python = ">=3.12,<3.13"
+dependencies = [
+    "fastmcp==0.3.0",
+    "starlette==0.37.2",
+    "uvicorn==0.27.1",
+    "duckdb==0.10.2",
+    "pandas==2.2.1",
+]
